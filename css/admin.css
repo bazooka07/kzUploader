@@ -8,9 +8,16 @@
 	background-color: #eee;
 	text-align: right;
 }
+.kzUploader form {
+	display: flex;
+}
+.kzUploader input[type="file"] {
+	flex-grow: 1;
+}
 .kzUploader label {
 	display: initial;
-	margin-left: 1rem;
+	/* margin-left: 1rem; */
+	margin-right: 0.8rem;
 	font-weight: bold;
 }
 .kzUploader input[type="file"] {
@@ -22,6 +29,18 @@
     text-align: center;
 	letter-spacing: 0.1rem;
     text-transform: uppercase;
+}
+.notification .kz-error { /* <span> */
+	display: inline-block;
+	width: 18rem;
+	text-align: initial;
+	font-weight: normal;
+	font-size: 12pt;
+}
+.notification .kz-error.kzLabel { /* <span> */
+	width: 6rem;
+	text-align: right;
+	color: #666;
 }
 @media (max-width: 1023px) {
 	.kzUploader {
