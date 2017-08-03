@@ -104,6 +104,7 @@ class kzUploader extends plxPlugin {
 		);
 		# Pour télécharger un fichier la balise <form..> doit avoir un attribut enctype adéquat
 ?>
+	<div class="<?php echo __CLASS__; ?>-spacer"><input type="button" style="visibility: hidden; "/></div> <?php /* Hack against PluXml */ ?>
 	<div class="<?php echo __CLASS__; ?>">
 		<form method="post" enctype="multipart/form-data" id="form-<?php echo __CLASS__; ?>">
 			<?php echo plxToken::getTokenPostMethod(); ?>
@@ -255,11 +256,18 @@ class kzUploader extends plxPlugin {
 	 * Traite les fichiers envoyés depuis le formulaire.
 	 * */
 	public function AdminPrepend() {
+		// Aucun envoi de page HTML: cookies possibles ici
 		global $plxAdmin, $lang;
 
 		$this->__themesRoot = PLX_ROOT.$plxAdmin->aConf['racine_themes'];
 
-		if(!empty($_SERVER['CONTENT_LENGTH'])) {
+		if(
+			!empty($_SERVER['CONTENT_TYPE']) and
+			preg_match('@^multipart/form-data@i', $_SERVER['CONTENT_TYPE']) and
+			!empty($_SERVER['CONTENT_LENGTH']) and
+			!empty($_POST[$this::INPUT_NAME.'-zip']) and
+			in_array($_POST[$this::INPUT_NAME.'-zip'],	array('plugin', 'theme'))
+		) {
 			$post_max_size = $this->ini_get('post_max_size');
 			if($_SERVER['CONTENT_LENGTH'] > $post_max_size) {
 				plxMsg::error(sprintf($this->getLang('L_POST_MAX_SIZE'), ($post_max_size / 1024)));
@@ -269,11 +277,9 @@ class kzUploader extends plxPlugin {
 			) {
 
 				# On finit l'exécution de prepend.php pour installer les phrases dans la langue choisie
-				global $plxAdmin, $lang;
-
-				loadLang(PLX_CORE.'lang/'.$lang.'/admin.php');
-				loadLang(PLX_CORE.'lang/'.$lang.'/core.php');
-				$_SESSION['admin_lang'] = $lang;
+				// loadLang(PLX_CORE.'lang/'.$lang.'/admin.php'); // Required for selection of new theme (L_SAVE_SUCCESSFUL)
+				// loadLang(PLX_CORE.'lang/'.$lang.'/core.php');
+				// $_SESSION['admin_lang'] = $lang;
 
 				# Control du token du formulaire
 				plxToken::validateFormToken($_POST);
@@ -281,10 +287,9 @@ class kzUploader extends plxPlugin {
 				# Control de l'accès à la page en fonction du profil de l'utilisateur connecté
 				$plxAdmin->checkProfil(PROFIL_ADMIN);
 
-				$tmpDir = '';
 				switch($_POST[$this::INPUT_NAME.'-zip']) {
-					case 'plugin': $tmpDir = PLX_PLUGINS; break;
-					case 'theme':	$tmpDir = $this->__themesRoot; break;
+					case 'plugin':	$tmpDir = PLX_PLUGINS; $success = 'L_DOWNLOADED_PLUGINS'; break;
+					case 'theme':	$tmpDir = $this->__themesRoot; $success = 'L_NEW_THEMAS'; break;
 				}
 				$tmpDir .= __CLASS__.'.XXXXX';
 				$errors = array();
@@ -360,7 +365,7 @@ class kzUploader extends plxPlugin {
 											) {
 												if(!is_dir($target)) {
 													rename($folders[0], $target);
-													$plxAdmin->editConfiguration($plxAdmin->aConf, array('style' => basename($folder)));
+													// $plxAdmin->editConfiguration($plxAdmin->aConf, array('style' => basename($folder)));
 												} else {
 													$errors[$genuine_name] = $this->getLang('L_THEMA_ALREADY_EXISTS');
 												}
@@ -405,7 +410,7 @@ class kzUploader extends plxPlugin {
 				if(!empty($errors)) {
 					$_SESSION[__CLASS__.'_errors'] = serialize($errors);
 				} else {
-					PlxMsg::Info(sprintf($this->getLang('L_DOWNLOADED_PLUGINS'), count($_FILES[$this::INPUT_NAME]['name'])));
+					PlxMsg::Info(sprintf($this->getLang($success), count($_FILES[$this::INPUT_NAME]['name'])));
 				}
 
 				header('Location: '.$_SERVER['PHP_SELF']);

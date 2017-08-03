@@ -4,9 +4,12 @@
 	left: calc(16.6666% - 1.5rem);
 	right: 0;
 	margin-top: 0.3rem;
-	padding: 0.5rem;
 	background-color: #eee;
 	text-align: right;
+}
+.kzUploader,
+.kzUploader-spacer {
+	padding: 0.5rem;
 }
 .kzUploader form {
 	display: flex;
@@ -57,6 +60,7 @@
 .kzUploader-error div p:last-of-type [type="button"] {
 	width: 100%;
 }
+/* expecting display:flex implemented in PluXml */
 @media (max-width: 1023px) {
 	.kzUploader {
 		left: calc(25% - 1.5rem);
