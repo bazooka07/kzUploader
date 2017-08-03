@@ -92,7 +92,7 @@ class kzUploader extends plxPlugin {
 	private function __printForm($field) {
 		switch($field) {
 			case 'plugin':	$label = $this->getLang('L_NEW_PLUGINS'); break;
-			case 'thema':	$label = $this->getLang('L_NEW_THEMAS'); break;
+			case 'theme':	$label = $this->getLang('L_NEW_THEMAS'); break;
 			default:		$label = 'Unknown';
 		}
 		$limits = json_encode(
@@ -107,7 +107,7 @@ class kzUploader extends plxPlugin {
 	<div class="<?php echo __CLASS__; ?>">
 		<form method="post" enctype="multipart/form-data" id="form-<?php echo __CLASS__; ?>">
 			<?php echo plxToken::getTokenPostMethod(); ?>
-			<input type="hidden" name="zip" value="<?php echo $field; ?>">
+			<input type="hidden" name="<?php echo $this::INPUT_NAME; ?>-zip" value="<?php echo $field; ?>">
 			<label for="id_<?php echo $this::INPUT_NAME; ?>"><?php  echo $label; ?></label>
 			<input
 				type="file"
@@ -180,15 +180,15 @@ class kzUploader extends plxPlugin {
 
 	private function __is_writable_folder() {
 		$result = false;
-		if(!empty($_POST['zip'])) {
-			switch($_POST['zip']) {
+		if(!empty($_POST[$this::INPUT_NAME.'-zip'])) {
+			switch($_POST[$this::INPUT_NAME.'-zip']) {
 				case 'plugin':
 					if(is_writable(PLX_PLUGINS))
 						$result = true;
 					else
 						plxMsg::Error(sprintf($this->getLang('L_UNWRITABLE_FOLDER'), realpath(PLX_PLUGINS)));
 					break;
-				case 'thema':
+				case 'theme':
 					if(is_writable($this->__themesRoot))
 						$result = true;
 					else
@@ -212,7 +212,7 @@ class kzUploader extends plxPlugin {
 
 	public function AdminThemesDisplayFoot() {
 		if(is_writable($this->__themesRoot)) {
-			$this->__printForm('thema');
+			$this->__printForm('theme');
 		} else {
 			# Trop tard pour envoyer un cookie avec plxMsg::error()
 			$this->__unwritableFolder($this->__themesRoot);
@@ -282,9 +282,9 @@ class kzUploader extends plxPlugin {
 				$plxAdmin->checkProfil(PROFIL_ADMIN);
 
 				$tmpDir = '';
-				switch($_POST['zip']) {
+				switch($_POST[$this::INPUT_NAME.'-zip']) {
 					case 'plugin': $tmpDir = PLX_PLUGINS; break;
-					case 'thema':	$tmpDir = $this->__themesRoot; break;
+					case 'theme':	$tmpDir = $this->__themesRoot; break;
 				}
 				$tmpDir .= __CLASS__.'.XXXXX';
 				$errors = array();
@@ -333,7 +333,7 @@ class kzUploader extends plxPlugin {
 							if(count($folders) == 1) {
 								if(file_exists($folders[0].'/infos.xml')) {
 									$folder = $folders[0];
-									switch($_POST['zip']) {
+									switch($_POST[$this::INPUT_NAME.'-zip']) {
 										case 'plugin':
 											# On renommera le dossier pour les archives issues de Github
 											$target = PLX_PLUGINS.preg_replace('@^([a-z_]\w*).*@i', '\1', basename($folder));
@@ -352,7 +352,7 @@ class kzUploader extends plxPlugin {
 												$errors[$genuine_name] = $this->getLang('L_INVALIDATE_PLUGIN');
 											}
 											break;
-										case 'thema':
+										case 'theme':
 											$target = $this->__themesRoot.basename($folders[0]);
 											if(
 												file_exists($folders[0].'/home.php') and
