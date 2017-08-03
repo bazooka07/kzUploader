@@ -2,19 +2,32 @@
 
 if (!defined('PLX_ROOT')) exit;
 
+// http://php.net/manual/fr/features.file-upload.post-method.php
+
 /**
  * Installe un plugin ou un thème avec le navigateur Internet.
  * La librairie ZipArchive est requise pour ce plugin.
  * @Author J.P. Pourrez <kazimentou@gmail.com>
+ * @version 1.1.0
  * */
 class kzUploader extends plxPlugin {
 
-	private $__themesRoot = false;
+	private $__themesRoot = false; // initialisé par le hook 'AdminPrepend'
+	private $__mime_types = false;
+
+	const INPUT_NAME = 'kzUploader';
+	const UPLOAD_ERRORS =
+		'upload_err_ok upload_err_ini_size upload_err_form_size '.
+		'upload_err_partial upload_err_no_file upload_err_no_tmp_dir '.
+		'upload_err_cant_write upload_err_extension';
 
 	public function __construct($default_lang) {
 
-		# on ne récupère que des archives Zip
-		if(class_exists('ZipArchive')) {
+		$mime_types = array();
+		if(class_exists('ZipArchive')) $mime_types[] = 'application/zip';
+		if(class_exists('PharData')) $mime_types[] = 'application/gzip';
+
+		if(!empty($mime_types)) {
 			# Appel du constructeur de la classe plxPlugin (obligatoire)
 			parent::__construct($default_lang);
 
@@ -25,10 +38,12 @@ class kzUploader extends plxPlugin {
 
 			# Ajouts des hooks
 			$this->addHook('AdminSettingsPluginsFoot', 'AdminSettingsPluginsFoot');
-			$this->addHook('AdminPrepend', 'AdminPrepend');
 			$this->addHook('AdminThemesDisplayFoot', 'AdminThemesDisplayFoot');
+			$this->addHook('AdminFootEndBody', 'AdminFootEndBody');
+			$this->addHook('AdminPrepend', 'AdminPrepend');
+			$this->__mime_types = $mime_types;
 		} else {
-			plxMsg::Error($this->getLang('L_MISSING_LIBRARY'));
+			plxMsg::Error($this->getLang('L_MISSING_LIBRARIES'));
 		}
 	}
 
@@ -76,9 +91,9 @@ class kzUploader extends plxPlugin {
 
 	private function __printForm($field) {
 		switch($field) {
-			case 'plugin':	$label = $this->getLang('L_NEW_PLUGIN'); break;
-			case 'thema':	$label = $this->getLang('L_NEW_THEMA'); break;
-			default:		$label = 'Unknow';
+			case 'plugin':	$label = $this->getLang('L_NEW_PLUGINS'); break;
+			case 'thema':	$label = $this->getLang('L_NEW_THEMAS'); break;
+			default:		$label = 'Unknown';
 		}
 		$limits = json_encode(
 			array(
@@ -87,57 +102,69 @@ class kzUploader extends plxPlugin {
 				'upload_max_filesize'	=> $this->ini_get('upload_max_filesize')
 			)
 		);
-	# Pour télécharger un fichier la balise <form..> doit avoir un attribut enctype adéquat
-	# la valeur de data-post doir être entre guillemets simple (JSON !)
+		# Pour télécharger un fichier la balise <form..> doit avoir un attribut enctype adéquat
 ?>
-	<div class="kzUploader">
-		<form method="post" enctype="multipart/form-data" id="form-kzUploader">
+	<div class="<?php echo __CLASS__; ?>">
+		<form method="post" enctype="multipart/form-data" id="form-<?php echo __CLASS__; ?>">
 			<?php echo plxToken::getTokenPostMethod(); ?>
 			<input type="hidden" name="zip" value="<?php echo $field; ?>">
-			<label for="id_kzUploader"><?php  echo $label; ?></label>
-			<input type="file" name="kzUploader" id="id_kzUploader" accept="application/zip,application/gzip" required />
+			<label for="id_<?php echo $this::INPUT_NAME; ?>"><?php  echo $label; ?></label>
+			<input
+				type="file"
+				name="<?php echo $this::INPUT_NAME; ?>[]"
+				id="id_<?php echo $this::INPUT_NAME; ?>"
+				accept="<?php echo implode(',', $this->__mime_types); ?>"
+				multiple="multiple"
+				required
+			/>
 			<input type="submit" value="<?php $this->lang('L_UPLOAD'); ?>"/>
 		</form>
 	</div>
 	<script type="text/javascript">
-		const limits = <?php echo $limits; ?>;
-		const messages = {
-			max_file_uploads:		'<?php $this->lang('L_MAX_FILE_UPLOADS'); ?>',
-			post_max_size:			'<?php $this->lang('L_POST_MAX_SIZE'); ?>',
-			upload_max_filesize:	'<?php $this->lang('L_UPLOAD_MAX_FILESIZE'); ?>'
-		};
-		const form = document.getElementById('form-kzUploader');
+		(function() { /* ------- kzUploader plugin ------- */
+			 // Prévient des limites imposées par PHP sur le serveur
 
-		form.addEventListener('submit', function(event) {
-			var	files = form.elements['kzUploader[]'].files,
-				controls = {
-					max_file_uploads: files.length,
-					post_max_size: 0,
-					upload_max_filesize: 0
+			'use strict';
+
+			const limits = <?php echo $limits; ?>;
+			const messages = {
+				max_file_uploads:		'<?php echo addslashes($this->getLang('JS_MAX_FILE_UPLOADS')); ?>',
+				post_max_size:			'<?php echo addslashes($this->getLang('JS_POST_MAX_SIZE')); ?>',
+				upload_max_filesize:	'<?php echo addslashes($this->getLang('JS_UPLOAD_MAX_FILESIZE')); ?>'
+			};
+			const form = document.getElementById('form-<?php echo __CLASS__; ?>');
+
+			form.addEventListener('submit', function(event) {
+				var	files = form.querySelector('input[type="file"]').files,
+					controls = {
+						max_file_uploads: files.length,
+						post_max_size: 0,
+						upload_max_filesize: 0
+					}
+
+				for(var i=0, iMax=files.length; i<iMax; i++) {
+					controls.post_max_size += files.item(i).size;
+					if(files.item(i).size > limits.upload_max_filesize) {
+						controls.upload_max_filesize++;
+					}
 				}
 
-			for(var i=0, iMax=files.length; i<iMax; i++) {
-				controls.post_max_size += files.item(i).size;
-				if(files.item(i).size > limits.upload_max_filesize) {
-					controls.upload_max_filesize++;
+				var msg = '';
+				for(var k in controls) {
+					if((k == 'upload_max_filesize' && controls.upload_max_filesize > 0) || controls[k] > limits[k]) {
+						var value = (k == 'post_max_size') ? (controls[k] / 1024).toFixed(0) : controls[k];
+						var limit = (k != 'max_file_uploads') ? (limits[k] / 1024).toFixed(0) : limits[k];
+						msg += messages[k].replace(/##1##/, value).replace(/##2##/, limit) + '\n';
+					}
 				}
-			}
 
-			var msg = '';
-			for(var k in controls) {
-				if((k == 'upload_max_filesize' && controls.upload_max_filesize > 0) || controls[k] > limits[k]) {
-					var value = (k == 'post_max_size') ? (controls[k] / 1024).toFixed(0) : controls[k];
-					var limit = (k != 'max_file_uploads') ? (limits[k] / 1024).toFixed(0) : limits[k];
-					msg += messages[k].replace(/##1##/, value).replace(/##2##/, limit) + '\n';
+				if(msg.length > 0) {
+					event.preventDefault();
+					alert('<?php $this->lang('JS_LIMITS_UPLOAD'); ?>:\n\n' + msg);
+					return false;
 				}
-			}
-
-			if(msg.length > 0) {
-				event.preventDefault();
-				alert(msg);
-				return false;
-			}
-		});
+			});
+		})();
 	</script>
 <?php
 	}
@@ -151,7 +178,7 @@ class kzUploader extends plxPlugin {
 <?php
 	}
 
-	private function is_writable_folder() {
+	private function __is_writable_folder() {
 		$result = false;
 		if(!empty($_POST['zip'])) {
 			switch($_POST['zip']) {
@@ -192,92 +219,56 @@ class kzUploader extends plxPlugin {
 		}
 	}
 
-	private function __unzip($filename) {
-		global $plxAdmin;
+	/**
+	 * Affiche un panneau si des erreurs se sont produites avec le Post.
+	 * */
+	public function AdminFootEndBody() {
+		// PlxMsg::Error gère mal les erreurs multiples
 
-		$redirect = 'index';
-		$zip = new ZipArchive();
-		if($zip->open($filename) === true) {
-			$tmpDir = '';
-			switch($_POST['zip']) {
-				case 'plugin': $tmpDir = PLX_PLUGINS; break;
-				case 'thema':	$tmpDir = $this->__themesRoot; break;
+		if(!empty($_SESSION[__CLASS__.'_errors'])) {
+			$errors = unserialize($_SESSION[__CLASS__.'_errors']);
+?>
+		<div class="<?php echo __CLASS__; ?>-error visible">
+			<div>
+<?php
+			foreach($errors as $filename=>$message) {
+?>
+				<p class="filename"><?php echo $filename; ?> :</p>
+				<p><?php echo $message; ?></p>
+<?php
 			}
-			$tmpDir .= __CLASS__.'.XXXXX';
-			if(is_dir($tmpDir)) {
-				$this->__rmDir($tmpDir);
-			}
-			mkdir($tmpDir, 0750);
-			try {
-				$zip->extractTo($tmpDir);
-				$folders = glob($tmpDir.'/*', GLOB_ONLYDIR);
-				if(count($folders) == 1) {
-					switch($_POST['zip']) {
-						case 'plugin':
-							# On corrige le nom du dossier pour les plugins issus de Github
-							$target = PLX_PLUGINS.preg_replace('@^([a-z_]\w*).*@i', '\1', basename($folders[0]));
-							if(!is_dir($target)) {
-								rename($folders[0], $target);
-							} else {
-								plxMsg::Error($this->getLang('L_PLUGIN_ALREADY_EXISTS'));
-							}
-							$redirect = 'parametres_plugins';
-							break;
-						case 'thema':
-							$target = $this->__themesRoot.basename($folders[0]);
-							if(!is_dir($target)) {
-								rename($folders[0], $target);
-								$plxAdmin->editConfiguration($plxAdmin->aConf, array('style' => basename($folders[0])));
-							} else {
-								plxMsg::Error($this->getLang('L_THEMA_ALREADY_EXISTS'));
-							}
-							$redirect = 'parametres_themes';
-							break;
-					}
-				} else {
-					plxMsg::Error($this->getLang('L_INVALIDATE_ZIP'));
-				}
-			} catch(Exception $e) {
-				plxMsg::Error($e->getMessage());
-			} finally {
-				$this->__rmDir($tmpDir);
-			}
-			$zip->close();
+?>
+			<p><input type="button" value="Close" /></p>
+			</div>
+		</div>
+		<script type="text/javascript">
+			document.querySelector('.<?php echo __CLASS__; ?>-error input[type="button"]').addEventListener('click', function(event) {
+				document.querySelector('.<?php echo __CLASS__; ?>-error.visible').classList.remove('visible');
+			});
+		</script>
+<?php
+			unset($_SESSION[__CLASS__.'_errors']);
 		}
-
-		return $redirect;
 	}
 
-	private function __gunzip($filename) {
-		global $plxAdmin;
-
-		$redirect = 'index';
-		$gz = gzopen($filename, 'r');
-		gzclose($gz);
-
-		return $redirect;
-	}
-
+	/**
+	 * Traite les fichiers envoyés depuis le formulaire.
+	 * */
 	public function AdminPrepend() {
 		global $plxAdmin, $lang;
 
 		$this->__themesRoot = PLX_ROOT.$plxAdmin->aConf['racine_themes'];
 
-		# Signature d'un fichier Zip: https://www.iana.org/assignments/media-types/application/zip
-		if(!empty($_FILES['kzUploader'])) {
-			if(
-				!empty($_FILES['kzUploader']['tmp_name']) and
-				($_FILES['kzUploader']['size'] > 0)  and
-				(in_array(
-					$_FILES['kzUploader']['type'],
-					array(
-						'application/zip',
-						'application/gzip'
-					))
-				) and
-				$this->is_writable_folder()
+		if(!empty($_SERVER['CONTENT_LENGTH'])) {
+			$post_max_size = $this->ini_get('post_max_size');
+			if($_SERVER['CONTENT_LENGTH'] > $post_max_size) {
+				plxMsg::error(sprintf($this->getLang('L_POST_MAX_SIZE'), ($post_max_size / 1024)));
+			} elseif(
+				!empty($_FILES[$this::INPUT_NAME])  and
+				$this->__is_writable_folder()
 			) {
-				# On finit l'execution de prepend.php pour installer les phrases dans la langue choisie
+
+				# On finit l'exécution de prepend.php pour installer les phrases dans la langue choisie
 				global $plxAdmin, $lang;
 
 				loadLang(PLX_CORE.'lang/'.$lang.'/admin.php');
@@ -290,40 +281,138 @@ class kzUploader extends plxPlugin {
 				# Control de l'accès à la page en fonction du profil de l'utilisateur connecté
 				$plxAdmin->checkProfil(PROFIL_ADMIN);
 
-				$msg = false;
-				switch($_FILES['kzUploader']['type']) {
-					case 'application/zip':
-						$redirect = $this->__unzip($_FILES['kzUploader']['tmp_name']);
-						break;
-					case 'application/gzip':
-						$redirect = $this->__ungzip($_FILES['kzUploader']['tmp_name']);
-						break;
-					default:
-						$redirect = 'index';
-						$msg = 'Bad mime-type';
+				$tmpDir = '';
+				switch($_POST['zip']) {
+					case 'plugin': $tmpDir = PLX_PLUGINS; break;
+					case 'thema':	$tmpDir = $this->__themesRoot; break;
 				}
-				if(!empty($msg)) {
-					PlxMsg::Error($msg);
-				} else {
-					PlxMsg::Info(sprintf($this->getLang('L_DOWNLOADED_PLUGIN'), $_FILES['kzUploader']['name']));
-				}
+				$tmpDir .= __CLASS__.'.XXXXX';
+				$errors = array();
+				# on boucle sur les fichiers
+				for($i=0, $iMax = count($_FILES[$this::INPUT_NAME]['name']); $i <$iMax; $i++) {
+					$genuine_name = $_FILES[$this::INPUT_NAME]['name'][$i]; // uniquement pour gérer les erreurs
+					if(
+						($_FILES[$this::INPUT_NAME]['error'][$i] == UPLOAD_ERR_OK) and
+						($_FILES[$this::INPUT_NAME]['size'][$i] > 0)  and
+						in_array($_FILES[$this::INPUT_NAME]['type'][$i], $this->__mime_types) and
+						!empty($_FILES[$this::INPUT_NAME]['tmp_name'][$i])
+					) {
+						if(is_dir($tmpDir)) {
+							$this->__rmDir($tmpDir);
+						}
+						mkdir($tmpDir, 0750);
 
-				unlink($_FILES['kzUploader']['tmp_name']);
+						$filename = $_FILES[$this::INPUT_NAME]['tmp_name'][$i];
+						try {
+							// Dépliage de l'archive
+							switch($_FILES[$this::INPUT_NAME]['type'][$i]) {
+								case 'application/zip':
+									$zip = new ZipArchive();
+									if($zip->open($filename) === true) {
+										$zip->extractTo($tmpDir);
+									}
+									break;
+								case 'application/gzip':
+									// PharData a besoin d'une extension de fichier correcte
+									if(empty(pathinfo($filename, PATHINFO_EXTENSION))) {
+										$extension = preg_replace('@^.*(.tar.gz|.tar.bz2|.tar)$@i', '$1', $_FILES[$this::INPUT_NAME]['name'][$i]);
+										rename($filename, $filename.$extension);
+										$filename .= $extension;
+									}
+									$phar = new PharData($filename);
+									if($phar !== false) {
+										$phar->extractTo($tmpDir);
+									}
+									break;
+								default:
+									$errors[$genuine_name] = 'Bad mime-type'; // En théorie, cette erreur n'arrivera jamais
+							}
 
-				header("Location: ${redirect}.php");
-				exit;
-			} else {
-				$content = '';
-				foreach(explode(' ', 'name type size error') as $field) {
-					if(array_key_exists($field, $_FILES['kzUploader'])) {
-						$value = $_FILES['kzUploader'][$field];
-						$content .= "<br /><span class=\"kz-error kzLabel\">$field</span>: <span class=\"kz-error\">$value</span>";
+							// On commence le traitement de l'archive dépliée
+							$folders = glob($tmpDir.'/*', GLOB_ONLYDIR);
+							if(count($folders) == 1) {
+								if(file_exists($folders[0].'/infos.xml')) {
+									$folder = $folders[0];
+									switch($_POST['zip']) {
+										case 'plugin':
+											# On renommera le dossier pour les archives issues de Github
+											$target = PLX_PLUGINS.preg_replace('@^([a-z_]\w*).*@i', '\1', basename($folder));
+											$className = basename($target);
+											$script_name = $folders[0]."/$className.php";
+											if(
+												file_exists($script_name) and
+												(count(preg_grep('@\bclass\s+'.$className.'\s+extends\s+plxPlugin\b@', file($script_name))) == 1)
+											) {
+												if(!is_dir($target)) {
+													rename($folder, $target);
+												} else {
+													$errors[$genuine_name] = $this->getLang('L_PLUGIN_ALREADY_EXISTS');
+												}
+											} else {
+												$errors[$genuine_name] = $this->getLang('L_INVALIDATE_PLUGIN');
+											}
+											break;
+										case 'thema':
+											$target = $this->__themesRoot.basename($folders[0]);
+											if(
+												file_exists($folders[0].'/home.php') and
+												is_dir($folders[0].'/lang')
+											) {
+												if(!is_dir($target)) {
+													rename($folders[0], $target);
+													$plxAdmin->editConfiguration($plxAdmin->aConf, array('style' => basename($folder)));
+												} else {
+													$errors[$genuine_name] = $this->getLang('L_THEMA_ALREADY_EXISTS');
+												}
+											} else {
+												$errors[$genuine_name] = $this->getLang('L_INVALIDATE_THEMA');
+											}
+											break;
+									}
+								} else {
+									$errors[$genuine_name] = $this->getLang('L_MISSING_INFOS_FILE');
+								}
+							} else {
+								$errors[$genuine_name] = $this->getLang('L_NOT_JUST_ONE_FOLDER');
+							}
+
+						} catch(Exception $e) {
+							$errors[$genuine_name] = $e->getMessage();
+						} finally {
+							if(isset($zip)) {
+								$zip->close();
+							}
+							$this->__rmDir($tmpDir);
+							if(file_exists($filename)) {
+								unlink($filename);
+							}
+						}
+					} else {
+						// mauvais fichier
+						if($_FILES[$this::INPUT_NAME]['error'][$i] != UPLOAD_ERR_OK) {
+							$error_code = $_FILES[$this::INPUT_NAME]['error'][$i];
+							$errors[$genuine_name] = ucfirst(explode(' ', $this::UPLOAD_ERRORS)[$error_code]);
+						} elseif($_FILES[$this::INPUT_NAME]['size'][$i] == 0) {
+							$errors[$genuine_name] = 'Empty file';
+						} elseif(!in_array($_FILES[$this::INPUT_NAME]['type'][$i], $this->__mime_types)) {
+							$errors[$genuine_name] = $this->getLang('L_BAD_TYPE_FILE').' '.$_FILES[$this::INPUT_NAME]['type'][$i];
+						} else {
+							$errors[$genuine_name] = 'No temporary file (stolen ?)';
+						}
 					}
-				}
-				PlxMsg::Error($this->getLang('L_BAD_TYPE_FILE').$content);
-			}
-		} // fin de if(!empty($_FILES['kzUploader'])...
+				} // fin de boucle sur les fichiers
 
+				if(!empty($errors)) {
+					$_SESSION[__CLASS__.'_errors'] = serialize($errors);
+				} else {
+					PlxMsg::Info(sprintf($this->getLang('L_DOWNLOADED_PLUGINS'), count($_FILES[$this::INPUT_NAME]['name'])));
+				}
+
+				header('Location: '.$_SERVER['PHP_SELF']);
+				exit;
+
+			} // fin de if(!empty($_FILES['kzUploader'])...
+		}
 	}
 
 }

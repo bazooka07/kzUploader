@@ -23,24 +23,39 @@
 .kzUploader input[type="file"] {
 	background-color: #fff;
 }
-.kzUploader.kz-error p {
-    color: red;
-    font-weight: bold;
-    text-align: center;
-	letter-spacing: 0.1rem;
-    text-transform: uppercase;
+.kzUploader-error {
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	top: 0;
+	display:none;
+	opacity: 0;
+	background-color: #000;
+	z-index: 10;
 }
-.notification .kz-error { /* <span> */
-	display: inline-block;
-	width: 18rem;
-	text-align: initial;
-	font-weight: normal;
-	font-size: 12pt;
+.kzUploader-error.visible {
+	display: block;
+	opacity: 0.9;
 }
-.notification .kz-error.kzLabel { /* <span> */
-	width: 6rem;
-	text-align: right;
-	color: #666;
+.kzUploader-error div {
+	opacity: 1.0;
+	background-color: #eee;
+	width: 40rem;
+	margin: 20% auto 0;
+	padding: 0.5rem;
+}
+.kzUploader-error div p {
+	margin: 0.5rem 0;
+}
+.kzUploader-error div p:nth-of-type(even) {
+	color: red;
+	background-color: #eee;
+}
+.kzUploader-error div p:last-of-type {
+	margin-bottom: 0;
+}
+.kzUploader-error div p:last-of-type [type="button"] {
+	width: 100%;
 }
 @media (max-width: 1023px) {
 	.kzUploader {
