@@ -1,6 +1,6 @@
 <?php
 $LANG = array(
-	// Supprimer les traductions  en commentaires	
+	// Supprimer les traductions  en commentaires
 	'L_BAD_TYPE_FILE'			=> 'Mauvais type de fichier',
 	'L_DOWNLOADED_PLUGINS'		=> '%d Plugin(s) installé(s)',
 	'L_INVALIDATE_PLUGIN'		=> 'Class du plugin incorrecte',
@@ -9,9 +9,9 @@ $LANG = array(
 	'L_MISSING_LIBRARIES'		=> 'Bibliothèques ZipArchive et Phar manquantes',
 	//'L_MISSING_LIBRARIES'			=> 'Bibliotèca ZipArchive mancanta',
 	//'L_NEW_PLUGIN'				=> 'Nòva extension',
-	'L_NEW_PLUGINS'				=> 'Nouveaux plugins',
+	'L_NEW_PLUGINS'				=> '%d nouveau(x) plugin(s)',
 	// 'L_NEW_THEMA'				=> 'Nòu tèma',
-	'L_NEW_THEMAS'				=> 'Nouveaux thèmes',
+	'L_NEW_THEMAS'				=> '%d nouveau(x) thème(s)',
 	'L_NOT_JUST_ONE_FOLDER'		=> 'Archiu Zip invalid. Deu conténer solament un dorsièr.',
 	'L_PLUGIN_ALREADY_EXISTS'	=> 'Una extension amb lo meteis nom existís ja',
 	'L_POST_MAX_SIZE'			=> 'La taille de l\'envoi du formulaire est trop grande (limite: %d Ko)',
